@@ -1,19 +1,23 @@
 #  gRPC over browser Javascript: Using gRPC-Web on Google Kubernetes Engine Ingress
 
 
-[grpc-web](https://github.com/grpc/grpc-web) offers a way to access your [gRPC](https://grpc.io/) application from browser.  You can read more about gRPC and gRPC-web in the references cited below.
+[grpc-web](https://github.com/grpc/grpc-web) offers a way to access your [gRPC](https://grpc.io/) API server from a modern browser.  Normally, API servers you call directly from browsers is plain `REST`...but its not well known that you can also call gRPC directly without involving [transcoding](https://github.com/grpc-ecosystem/grpc-httpjson-transcoding) or REST but a modification of the standard gRPC wire protocol adapted to account for browser limitations.  
 
-This is a sample application deployed on GKE which demonstrates a simple 'helloworld' application covering
+So last wee i wanted to create a simple helloworld app for grpcWeb and succeded in doing that direclty on my laptop (you can see that sample [here](https://github.com/salrashid123/gcegrpc/tree/master/grpc-web).  As a further extension, I endedup adapting that sample sample to run on GKE direclty with its HTTP/2 Ingress resource capability.  That is, this sample deploys a simple webapp which from the browser calls a gRPC server!
 
-1. browser -> webserver
-2. webserver responds back with html page including webpack javascript w/ grpc Client code
-4. browser issues grpc-web API call envoy proxy
-5. envoy forwards gRPC request to you backend API
-6. backend API responds back with unary or streamed requests
+The basic flow for this app would be:
+
+1. browser requests a plain HTML page from a webserver on GKE (externally exposed via Ingress)
+2. webserver responds back with html page including some javascript w/ grpc Client code
+4. browser then issues grpc-web API call to the same Ingress endpoint but routed towards an Envoy proxy backend
+5. envoy forwards gRPC request to your backend gRPC server over true `grpc://`
+6. backend API responds back to request with unary or streamed response.
 
 As a bonus, this sample also exposes the gRPC server's port directly.  This allows ordinary gRPC clients written in any language to connect and issue API requests.
 
 - ![images/grpc_web.png](images/grpc_web.png)
+
+You can read more about gRPC and gRPC-web in the references cited below.
 
 ## gRPC Transcoding vs gRPC Web vs gRPC Native
 
@@ -26,7 +30,7 @@ Google Cloud Enpoints supports this type of transcoding via annotations as descr
  -[https://cloud.google.com/endpoints/docs/grpc/about-grpc](https://cloud.google.com/endpoints/docs/grpc/about-grpc)
  -[https://cloud.google.com/endpoints/docs/grpc/transcoding](https://cloud.google.com/endpoints/docs/grpc/transcoding)
 
-Here is an example hello-world for the same:
+Here is an example hello-world app for gRPCTranscoding using Cloud Endpoints
 - [Google Cloud Endpoints: REST and gRPC, gRPC+Transcoding](https://github.com/salrashid123/esp_docker)
 
 
