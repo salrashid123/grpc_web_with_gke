@@ -126,7 +126,7 @@ The grpc_backend listens on port `:50051` so to run it localy, execute something
 You can even test the grpc Client locally by running
 
 ```
-docker run --add-host grpc.domain.com:127.0.0.1 -t salrashid123/grpc_backend /grpc_client --host grpc.domain.com:50051
+docker run --net=host --add-host grpc.domain.com:127.0.0.1 -t salrashid123/grpc_backend /grpc_client --host grpc.domain.com:50051
 ```
 
 #### Frontend
@@ -305,13 +305,13 @@ openssl req -x509 -days 600 -new -nodes -key CA_key.pem -out CA_crt.pem -extensi
 
 - Edit `openssl.cnf` and set the  SNI values as needed
 
-`
+```
 [alt_names]
 DNS.1 = server.domain.com
 DNS.2 = grpc.domain.com
 DNS.3 = grpcweb.domain.com
 DNS.4 = localhost
-`
+```
 
 - Generate the server certificates
 ```
