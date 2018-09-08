@@ -9,7 +9,6 @@ metadata:
       service.alpha.kubernetes.io/app-protocols: '{"be-grpc":"HTTP2"}'    
 spec:
   type: NodePort
-  #type: LoadBalancer  
   ports:
   - name: be-grpc
     port: 50051

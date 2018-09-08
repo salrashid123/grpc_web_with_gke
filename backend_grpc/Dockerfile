@@ -21,7 +21,6 @@ RUN go get  github.com/golang/protobuf/proto \
         golang.org/x/net/trace \
         golang.org/x/net/http2 \
         golang.org/x/net/http2/hpack
-
 RUN go get -u github.com/golang/protobuf/protoc-gen-go        
 
 ADD . /go/
@@ -39,6 +38,8 @@ COPY --from=build /go/CA_crt.pem /
 COPY --from=build /go/bin /
 
 
+EXPOSE 8081
 EXPOSE 50051
 
-#ENTRYPOINT ["grpc_server","-grpcport", "0.0.0.0:50051"]
+#ENTRYPOINT ["grpc_server", "--grpcport", ":50051", "--httpport", ":8081"]
+#ENTRYPOINT ["grpc_client", "--host",  "server.domain.com:50051"]

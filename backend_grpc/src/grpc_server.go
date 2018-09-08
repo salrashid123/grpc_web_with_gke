@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
 	"os"
 
 	"echo"
 
 	"golang.org/x/net/context"
+	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
@@ -19,6 +21,7 @@ import (
 
 var (
 	grpcport = flag.String("grpcport", "", "grpcport")
+	httpport = flag.String("httpport", ":8081", "httpport")
 )
 
 const ()
@@ -39,9 +42,8 @@ func (s *server) SayHelloStream(in *echo.EchoRequest, stream echo.EchoServer_Say
 		log.Fatalf("grpc.SendHeader(%v, %v) = %v, want %v", ctx, respmdheader, err, nil)
 	}
 
-	stream.Send(&echo.EchoReply{Message: "Streaming Response 1 for Request " + in.Name})
-	stream.Send(&echo.EchoReply{Message: "Streaming Response 2 for Request " + in.Name})
-	stream.Send(&echo.EchoReply{Message: "Streaming Response 3 for Request " + in.Name})
+	stream.Send(&echo.EchoReply{Message: "Msg1 " + in.Name})
+	stream.Send(&echo.EchoReply{Message: "Msg2 " + in.Name})
 
 	var respmdfooter = metadata.MD{
 		"streamtrailerkey": []string{"val"},
@@ -78,6 +80,16 @@ func (s *server) SayHello(ctx context.Context, in *echo.EchoRequest) (*echo.Echo
 	return &echo.EchoReply{Message: "Hello " + in.Name + "  from hostname " + h}, nil
 }
 
+func fronthandler(w http.ResponseWriter, r *http.Request) {
+	//log.Println("Main Handler")
+	fmt.Fprint(w, "hello world")
+}
+
+func healthhandler(w http.ResponseWriter, r *http.Request) {
+	//log.Println("heathcheck...")
+	fmt.Fprint(w, "ok")
+}
+
 func main() {
 
 	flag.Parse()
@@ -87,6 +99,20 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
+	if *httpport == "" {
+		fmt.Fprintln(os.Stderr, "missing -httpport flag, using defaults(:8080)")
+	}
+
+	http.HandleFunc("/", fronthandler)
+	http.HandleFunc("/_ah/health", healthhandler)
+
+	srv := &http.Server{
+		Addr: *httpport,
+	}
+	http2.ConfigureServer(srv, &http2.Server{})
+	go srv.ListenAndServeTLS("server_crt.pem", "server_key.pem")
+	//go srv.ListenAndServe()
+	//go http.ListenAndServe(*httpport, nil)
 
 	ce, err := credentials.NewServerTLSFromFile("server_crt.pem", "server_key.pem")
 	if err != nil {
