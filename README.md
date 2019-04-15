@@ -35,7 +35,7 @@ Here is an example hello-world app for gRPCTranscoding using Cloud Endpoints
 
 
 ## Cloud Endpoints support for gRPC-Web
- 
+
   The example in this repo utilizes Envoy.  You can also use Google Cloud Endpoint's ESP proxy which provides basic grpc-web support in addition to other features/capabilities of Endpoints like API management.
 
 - [https://github.com/cloudendpoints/esp/blob/master/CHANGELOG.md#release-1100-24-10-2017](https://github.com/cloudendpoints/esp/blob/master/CHANGELOG.md#release-1100-24-10-2017)
@@ -44,16 +44,16 @@ Here is an example hello-world app for gRPCTranscoding using Cloud Endpoints
 ## Setup
 
 
-### Allocate StaticIP 
- 
- This step isn't necessary but use statically bound the name `gke-ingress` to the Ingress objects later
+### Allocate StaticIP
+
+ This step isn't necessary but use statically bound the name `gke-web-ingress` to the Ingress objects later
 
 ```
-gcloud compute addresses create gke-ingress --global
+gcloud compute addresses create gke-web-ingress --global
 
 gcloud compute addresses list
-NAME         REGION  ADDRESS        STATUS
-gke-ingress          35.241.41.138  RESERVED
+NAME             REGION  ADDRESS        STATUS
+gke-web-ingress          35.241.41.138  RESERVED
 ```
 
 ### Edit /etc/hosts
@@ -69,7 +69,7 @@ Since this is just a demo/POC, statically set the IP to resolve to `.domain.com`
 ### Create the GKE cluster
 
 ```
-gcloud container  clusters create grpc-cluster --machine-type "n1-standard-1" --cluster-version=1.10.5 --zone us-central1-a  --num-nodes 3
+gcloud container  clusters create grpc-cluster --machine-type "n1-standard-1"  --zone us-central1-a  --num-nodes 3
 ```
 
 
@@ -107,6 +107,7 @@ message EchoReply {
 
 
 You can either build the backend or use the one I uploaded here:
+ - [gcesamples](https://github.com/salrashid123/gcegrpc/tree/master/app)
 
 - `docker.io/salrashid123/grpc_backend`
 
@@ -166,6 +167,7 @@ The grpc_proxy listens on port `:18080`. You can run it locally within a docker 
 If you choose to use the images I uploaded, just run:
 
 ```
+$ cd gke_config/
 $ kubectl apply -f .
 ```
 
@@ -258,14 +260,14 @@ x-envoy-upstream-service-time: 0
 The setup here also enables direct gRPC client calls outside of a browser.  This means you can use any gRPC client directly.  In the example below, we are using a golang gRPC client (remember to change the IP address to your Ingress's IP before invoking)
 
 ```
-$ docker run --add-host grpc.domain.com:35.241.41.138  -t gcr.io/mineral-minutia-820/grpc_backend /grpc_client --host grpc.domain.com:443
-2018/09/03 15:55:33 RPC Response: 0 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn" 
-2018/09/03 15:55:34 RPC Response: 1 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn" 
-2018/09/03 15:55:35 RPC Response: 2 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth" 
-2018/09/03 15:55:36 RPC Response: 3 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth" 
-2018/09/03 15:55:37 RPC Response: 4 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth" 
-2018/09/03 15:55:38 RPC Response: 5 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn" 
-2018/09/03 15:55:39 RPC Response: 6 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn" 
+$ docker run --add-host grpc.domain.com:35.241.41.138  -t salrashid123/grpc_backend /grpc_client --host grpc.domain.com:443
+2018/09/03 15:55:33 RPC Response: 0 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
+2018/09/03 15:55:34 RPC Response: 1 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
+2018/09/03 15:55:35 RPC Response: 2 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth"
+2018/09/03 15:55:36 RPC Response: 3 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth"
+2018/09/03 15:55:37 RPC Response: 4 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth"
+2018/09/03 15:55:38 RPC Response: 5 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
+2018/09/03 15:55:39 RPC Response: 6 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
 ```
 
 The response shows the backends that handled each request.  Note that the responses are from different backends over a *single* connection.  THis is as expected since the GCP L7 loadbalancer (Ingress), send each RPC to different pods to balance loads.
@@ -322,4 +324,3 @@ openssl ca -config openssl.cnf -days 400 -notext  -in server_csr.pem   -out serv
 
 - Copy the `.pem` files to each folder (`frontend/`, `backend_grpc/`, `backend_envoy`).
 - Edit `gke_config/fe-secret.yaml` and place the base64 encoded version of the server cert/key file as the tls key and cert.
-
