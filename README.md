@@ -69,7 +69,7 @@ Since this is just a demo/POC, statically set the IP to resolve to `.domain.com`
 ### Create the GKE cluster
 
 ```
-gcloud container  clusters create grpc-cluster --machine-type "n1-standard-1"  --zone us-central1-a  --num-nodes 3
+gcloud container  clusters create grpc-cluster --machine-type "n1-standard-1"  --zone us-central1-a  --num-nodes 3 --enable-ip-alias
 ```
 
 

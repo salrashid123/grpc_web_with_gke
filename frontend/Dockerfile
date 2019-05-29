@@ -1,5 +1,5 @@
 FROM grpcweb/common as build-env
-
+RUN apt-get update && apt-get install -y libprotoc-dev
 RUN  git clone https://github.com/grpc/grpc-web.git && \
      cd grpc-web && \
      make install-plugin
