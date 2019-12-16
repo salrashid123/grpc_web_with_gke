@@ -1,0 +1,31 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: be-deployment
+  labels:
+    app: be
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: be
+    spec:
+      containers:
+      - name: envoy-container
+        image: salrashid123/grpc_envoyproxy
+        imagePullPolicy: Always          
+        ports:
+        - containerPort: 18080
+          protocol: TCP
+        # livenessProbe:
+        #   httpGet:
+        #     path: /
+        #     scheme: HTTPS
+        #     port: 18080
+        # readinessProbe:
+        #   httpGet:
+        #     path: /
+        #     scheme: HTTPS
+        #     port: 18080
+        

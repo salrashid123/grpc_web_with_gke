@@ -65,7 +65,7 @@ x509_extensions	= v3_ca	# The extentions to add to the self signed cert
 
 string_mask = nombstr
 
-#req_extensions = v3_req # The extensions to add to a certificate request
+req_extensions = v3_req # The extensions to add to a certificate request
 
 [ req_distinguished_name ]
 

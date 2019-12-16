@@ -41,8 +41,35 @@ Here is an example hello-world app for gRPCTranscoding using Cloud Endpoints
 - [https://github.com/cloudendpoints/esp/blob/master/CHANGELOG.md#release-1100-24-10-2017](https://github.com/cloudendpoints/esp/blob/master/CHANGELOG.md#release-1100-24-10-2017)
 
 
+## GKE-Ingress HealthCheck workarounds
+
+`Update: 12/16/19`:  Google GKE Ingress enables HTTP-based healthchecks against the `Serving Port` of the target GKE service:
+- [https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks](https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks)
+  This forces the grpc Service running to respond to both HTTP requests for healthchecks as well as regular gRPC.  That is, the envoy proxy that brokers grpc-web will need to respond back on GCE healthchecks at `/` (or whatever is set on the readinessProbe) via the following config in `envoy.yaml`:
+
+```yaml
+              routes:
+              - match:
+                  path: "/" 
+                direct_response:
+                  body:
+                    inline_string: 'ok'
+                  status: 200
+              - match: { prefix: "/echo.EchoServer" }
+                route: { cluster: echo_service }  
+```
+
+  (`TODO`: At the moment the `/` endpoint on envoy is exposed externally; make it only respond back to the internal HC)
+
+  The default architecture above shows how you can also connect directly to the grpc service as it runs internally.  The ability to connect directly is not the focus of this article so I've left theat configuration commented out.  If you wanted to expose the gRPC service externally as well, please account for the healthchecks as described here:
+  * [https://github.com/salrashid123/gcegrpc/tree/master/gke_ingress_lb](https://github.com/salrashid123/gcegrpc/tree/master/gke_ingress_lb)   
+
+  - [Ingress-gce PR#807](https://github.com/kubernetes/ingress-gce/pull/807)
+
+
 ## Setup
 
+Anyway, if you are still interested:
 
 ### Allocate StaticIP
 
@@ -111,20 +138,17 @@ You can either build the backend or use the one I uploaded here:
 
 - `docker.io/salrashid123/grpc_backend`
 
-To build, simply run the following and upload
+To build, git clone the repos above
 
 ```
 cd backend_grpc
 docker build -t your_registry/grpc_backend .
 ```
 
-The grpc_backend listens on port `:50051` so to run it localy, execute something like:
-
+to run locally,
 ```
  docker run  -p 50051:50051 -t salrashid123/grpc_backend ./grpc_server -grpcport 0.0.0.0:50051
 ```
-
-You can even test the grpc Client locally by running
 
 ```
 docker run --net=host --add-host grpc.domain.com:127.0.0.1 -t salrashid123/grpc_backend /grpc_client --host grpc.domain.com:50051
@@ -177,36 +201,35 @@ Otherwise, edit each yaml file under `gke_config/` folder and change the image r
 Once you deploy, you should see the deploymets and the staticIP attached to the Ingress object:
 
 ```bash
-$ kubectl get no,po,rc,svc,ing,deployments,secrets
-NAME                                             STATUS    ROLES     AGE       VERSION
-no/gke-grpc-cluster-default-pool-20747835-3sw8   Ready     <none>    11h       v1.10.5-gke.4
-no/gke-grpc-cluster-default-pool-20747835-s0z3   Ready     <none>    11h       v1.10.5-gke.4
+$ kubectl get po,rc,svc,ing,deployments,secrets
+NAME                                      READY   STATUS    RESTARTS   AGE
+pod/be-deployment-86c95c96d9-7wlmr        1/1     Running   0          2m58s
+pod/be-grpc-deployment-5b97d84c56-mnqxc   1/1     Running   0          2m58s
+pod/fe-deployment-d9c6b559f-6b79p         1/1     Running   0          2m57s
+pod/fe-deployment-d9c6b559f-gxqt9         1/1     Running   0          2m57s
 
-NAME                                READY     STATUS    RESTARTS   AGE
-po/be-deployment-75978bd8bf-bn5fp   2/2       Running   0          2m
-po/be-deployment-75978bd8bf-k5x6b   2/2       Running   0          2m
-po/fe-deployment-574d47d8c-lktkm    1/1       Running   0          2m
-po/fe-deployment-574d47d8c-x4w8z    1/1       Running   0          1m
+NAME                  TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)           AGE
+service/be-srv        NodePort    10.0.7.254   <none>        18080:30406/TCP   2m58s <<<<<< Envoy
+service/be-srv-grpc   ClusterIP   10.0.6.44    <none>        50051/TCP         2m58s <<<<<< gRPC Service
+service/fe-srv        NodePort    10.0.2.189   <none>        8000:32470/TCP    2m57s <<<<<< Frontend
+service/kubernetes    ClusterIP   10.0.0.1     <none>        443/TCP           17h
 
-NAME              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)           AGE
-svc/be-srv        NodePort    10.19.251.246   <none>        18080:31592/TCP   9h
-svc/be-srv-grpc   NodePort    10.19.240.140   <none>        50051:31610/TCP   9h
-svc/fe-srv        NodePort    10.19.247.166   <none>        8000:31713/TCP    9h
-svc/kubernetes    ClusterIP   10.19.240.1     <none>        443/TCP           11h
+NAME                               HOSTS                                  ADDRESS          PORTS     AGE
+ingress.extensions/basic-ingress   server.domain.com,grpcweb.domain.com   35.241.41.138    80, 443   2m59s
 
-NAME                HOSTS                                                  ADDRESS         PORTS     AGE
-ing/basic-ingress   server.domain.com,grpcweb.domain.com,grpc.domain.com   35.241.41.138   80, 443   9h
+NAME                                       READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.extensions/be-deployment        1/1     1            1           2m59s
+deployment.extensions/be-grpc-deployment   1/1     1            1           2m59s
+deployment.extensions/fe-deployment        2/2     2            2           2m58s
 
-NAME                   DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
-deploy/be-deployment   2         2         2            2           9h
-deploy/fe-deployment   2         2         2            2           9h
-
-NAME                          TYPE                                  DATA      AGE
-secrets/default-token-v958b   kubernetes.io/service-account-token   3         11h
-secrets/fe-secret             Opaque                                2         9h
+NAME                         TYPE                                  DATA   AGE
+secret/default-token-rtv7m   kubernetes.io/service-account-token   3      17h
+secret/fe-secret             Opaque                                2      2m58s
 ```
 
 > *NOTE:* Deployment and availability of the endpoint IP may take `8->10minutes`
+
+![images/ingress_config.png](images/ingress_config.png)
 
 ## Browser
 
@@ -218,6 +241,7 @@ Trust the `CA_crt.pem` file in Firefox since its self-singed.  Open up `Firefox`
 Now go to `https://server.domain.com/`.  You should see the nodejs Frontend,  You may wan to open up developer tools to see the request/response streams
 
 Click the `Submit` button.  WHat that will do is transmit 1 unary request and 1 server-streaming request.  The unary request will respond back with the hostname that handled the request.   Below that you should see three RPC responses back from the server request.
+
 
 Here is a sample Request-Response from the browser
 
@@ -257,7 +281,10 @@ x-envoy-upstream-service-time: 0
 
 ## gRPC Client
 
-The setup here also enables direct gRPC client calls outside of a browser.  This means you can use any gRPC client directly.  In the example below, we are using a golang gRPC client (remember to change the IP address to your Ingress's IP before invoking)
+The following configuration describes how to access the gRPC service directly (i.,e not via envoy or grpc-Web).
+
+The main issue with this is you need to account for the healthcheck and grpc ports at the same time as described above.  It just **HAPPENS** that a `/` HTTP/2 request to a golang webserver responds back with a `200 OK` which is enough for the GPC HC to think its all good.  ofcourse do NOT do rely on this capability!!! its just golag (other languages like java and python gRPC services do not honor that same behavior).
+So, if you just wanted to test external connectivity in golang...change the service type in the yaml file from `ClusterIP` --> `NodePort`, redeploy....again, just do this to see; do not use this in prod..
 
 ```
 $ docker run --add-host grpc.domain.com:35.241.41.138  -t salrashid123/grpc_backend /grpc_client --host grpc.domain.com:443
@@ -270,11 +297,12 @@ $ docker run --add-host grpc.domain.com:35.241.41.138  -t salrashid123/grpc_back
 2018/09/03 15:55:39 RPC Response: 6 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
 ```
 
-The response shows the backends that handled each request.  Note that the responses are from different backends over a *single* connection.  THis is as expected since the GCP L7 loadbalancer (Ingress), send each RPC to different pods to balance loads.
 
 ## Conclusion
 
 `gRPC-web` and `gRPC` offers many advantages to API developers thats inherent in the protocol and toolchains.  Before you jump in, please read through what you actually need/want from your API and clients.  Often enough, for low-intensity APIs or simple clients, `REST` is a perfectly fine to use (easy to use, easy to setup; widespread support, etc)...it just depends on your current and future needs.
+
+Also, the healthcheck limitations described above makes it much more challenging to deploy in a practical sense at the moment.
 
 Anyway, hope this article helps bridge some the gaps and shows how you can use `grpc-web` on GKE.  You ofcourse do not need to use GKE...take a look at the examples in the reference section below to get started locally or on any platform.
 
@@ -318,7 +346,7 @@ DNS.4 = localhost
 - Generate the server certificates
 ```
 openssl genrsa -out server_key.pem 2048
-openssl req -config openssl.cnf -days 400 -out server_csr.pem -key server_key.pem -new -sha256  -extensions v3_req  -subj "/C=US/ST=California/L=Mountain View/O=Google/OU=Enterprise/CN=server.domain.com"
+openssl req -config openssl.cnf  -out server_csr.pem -key server_key.pem -new -sha256  -extensions v3_req  -subj "/C=US/ST=California/L=Mountain View/O=Google/OU=Enterprise/CN=server.domain.com"
 openssl ca -config openssl.cnf -days 400 -notext  -in server_csr.pem   -out server_crt.pem
 ```
 

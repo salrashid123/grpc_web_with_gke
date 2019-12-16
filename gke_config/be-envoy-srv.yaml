@@ -6,7 +6,8 @@ metadata:
   labels:
     type: be-srv
   annotations:
-    service.alpha.kubernetes.io/app-protocols: '{"be":"HTTP2"}'  
+    service.alpha.kubernetes.io/app-protocols: '{"be":"HTTPS"}'
+    cloud.google.com/neg: '{"ingress": true}'
 spec:
   type: NodePort 
   ports:

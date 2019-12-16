@@ -3,8 +3,8 @@ kind: Ingress
 metadata:
   name: basic-ingress
   annotations:
-    kubernetes.io/ingress.global-static-ip-name: "gke-web-ingress"
-    kubernetes.io/ingress.allow-http: "false"  
+    kubernetes.io/ingress.global-static-ip-name: "gke2-ingress"
+    kubernetes.io/ingress.allow-http: "false"
 spec:
   tls:
   - secretName: fe-secret
@@ -23,10 +23,10 @@ spec:
         backend:
           serviceName: be-srv
           servicePort: 18080
-  - host: grpc.domain.com  
-    http:
-      paths:
-      - path: /*
-        backend:
-          serviceName: be-srv-grpc
-          servicePort: 50051
+  # - host: grpc.domain.com  
+  #   http:
+  #     paths:
+  #     - path: /*
+  #       backend:
+  #         serviceName: be-srv-grpc
+  #         servicePort: 50051
