@@ -44,22 +44,11 @@ Here is an example hello-world app for gRPCTranscoding using Cloud Endpoints
 ## GKE-Ingress HealthCheck workarounds
 
 `Update: 12/16/19`:  Google GKE Ingress enables HTTP-based healthchecks against the `Serving Port` of the target GKE service:
-- [https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks](https://cloud.google.com/kubernetes-engine/docs/concepts/ingress#health_checks)
-  This forces the grpc Service running to respond to both HTTP requests for healthchecks as well as regular gRPC.  That is, the envoy proxy that brokers grpc-web will need to respond back on GCE healthchecks at `/` (or whatever is set on the readinessProbe) via the following config in `envoy.yaml`:
 
-```yaml
-              routes:
-              - match:
-                  path: "/" 
-                direct_response:
-                  body:
-                    inline_string: 'ok'
-                  status: 200
-              - match: { prefix: "/echo.EchoServer" }
-                route: { cluster: echo_service }  
-```
+- [Custom health check configuration](https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-features#direct_health)
+The BackendConfig makes the workarounds using mux and envoy described  in this repo obsolete but you still need an a POD that proxies HTTP healthcheck requests....thats a todo for me to update this repo...
 
-  (`TODO`: At the moment the `/` endpoint on envoy is exposed externally; make it only respond back to the internal HC)
+`Update 6/26/21`:   GCP now support a BackendConfig that supports independent HealthChecks over HTTP that Ingress understands:
 
   The default architecture above shows how you can also connect directly to the grpc service as it runs internally.  The ability to connect directly is not the focus of this article so I've left theat configuration commented out.  If you wanted to expose the gRPC service externally as well, please account for the healthchecks as described here:
   * [https://github.com/salrashid123/gcegrpc/tree/master/gke_ingress_lb](https://github.com/salrashid123/gcegrpc/tree/master/gke_ingress_lb)   
@@ -113,7 +102,7 @@ The gRPC backend is a golang app that simply Echo's back a message as Unary or S
 
 There is the proto:
 
-```
+```proto
 syntax = "proto3";
 
 package echo;
