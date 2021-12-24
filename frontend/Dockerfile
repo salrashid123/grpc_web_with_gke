@@ -1,8 +1,15 @@
-FROM grpcweb/common as build-env
-RUN apt-get update && apt-get install -y libprotoc-dev
-RUN  git clone https://github.com/grpc/grpc-web.git && \
-     cd grpc-web && \
-     make install-plugin
+FROM node:8 as build-env-node
+
+RUN apt-get update -y && apt-get install -y build-essential wget unzip curl
+
+RUN curl -OL https://github.com/google/protobuf/releases/download/v3.19.1/protoc-3.19.1-linux-x86_64.zip && \
+    unzip protoc-3.19.1-linux-x86_64.zip -d protoc3 && \
+    mv protoc3/bin/* /usr/local/bin/ && \
+    mv protoc3/include/* /usr/local/include/
+
+RUN wget  -O  /usr/local/bin/protoc-gen-grpc-web https://github.com/grpc/grpc-web/releases/download/1.3.0/protoc-gen-grpc-web-1.3.0-linux-x86_64 
+RUN chmod +x /usr/local/bin/protoc-gen-grpc-web
+
 ADD . /app
 WORKDIR /app
 ADD package_build.json /app/package.json
@@ -12,19 +19,8 @@ RUN npm install --silent && \
     npx webpack client.js
 
 
-FROM node:8 as build-env-node
-COPY --from=build-env /app/dist /app/dist
-WORKDIR /app
 ADD package_web.json /app/package.json
 RUN npm  install --silent
 
-
-FROM node:8
-COPY --from=build-env-node /app /app
-ADD app.js /app/app.js
-ADD CA_crt.pem /app/CA_crt.pem
-ADD server_crt.pem /app/server_crt.pem
-ADD server_key.pem /app/server_key.pem
-WORKDIR /app
 EXPOSE  8000
 CMD ["node", "app.js"]

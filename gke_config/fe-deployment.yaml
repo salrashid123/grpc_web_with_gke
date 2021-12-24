@@ -18,7 +18,7 @@ spec:
       containers:
       - name: fe-container
         image: salrashid123/web_frontend
-        imagePullPolicy: Always                   
+        imagePullPolicy: IfNotPresent                   
         ports:
         - containerPort: 8000
           protocol: TCP

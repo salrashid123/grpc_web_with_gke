@@ -22,14 +22,5 @@ spec:
         ports:
         - containerPort: 18080
           protocol: TCP
-        # livenessProbe:
-        #   httpGet:
-        #     path: /
-        #     scheme: HTTPS
-        #     port: 18080
-        # readinessProbe:
-        #   httpGet:
-        #     path: /
-        #     scheme: HTTPS
-        #     port: 18080
-        
+        - containerPort: 18081
+          protocol: TCP

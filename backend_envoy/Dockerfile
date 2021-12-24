@@ -1,8 +1,9 @@
-FROM envoyproxy/envoy:latest
+FROM envoyproxy/envoy:v1.20.1
 
 COPY envoy.yaml /etc/envoy/envoy.yaml
 
 EXPOSE 18080
+EXPOSE 18081
 
 
 ADD CA_crt.pem /etc/envoy/CA_crt.pem

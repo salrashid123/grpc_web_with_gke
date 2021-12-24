@@ -5,38 +5,44 @@ metadata:
   annotations:
     kubernetes.io/ingress.global-static-ip-name: "gke-web-ingress"
     kubernetes.io/ingress.allow-http: "false"
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/v1beta1.FrontendConfig: "fe-frontend-config"  
 spec:
   tls:
-  - secretName: fe-secret
+  - hosts:
+    - server.domain.com
+    - grpcweb.domain.com
+    secretName: fe-secret
+  defaultBackend:
+    service:
+      name: fe-srv
+      port:
+        number: 8000    
   rules:
-  - host: server.domain.com  
+  - host: "server.domain.com"
     http:
       paths:
       - path: /*
-        pathType: Prefix
+        pathType: ImplementationSpecific        
         backend:
           service:
             name: fe-srv
             port:
               number: 8000
-  - host: grpcweb.domain.com  
+  - host: "grpcweb.domain.com"
     http:
       paths:
       - path: /*
-        pathType: Prefix
+        pathType: ImplementationSpecific        
         backend:
           service:
             name: be-srv
             port:
               number: 18080
-  # - host: grpc.domain.com  
-  #   http:
-  #     paths:
-  #     - path: /*
-  #       pathType: Prefix
-  #       backend:
-          # service:
-          #   name: be-srv-grpc
-          #   port:
-          #     number: 50051  
-
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: fe-frontend-config
+spec:
+  sslPolicy: gke-ingress-ssl-policy

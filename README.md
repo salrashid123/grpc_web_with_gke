@@ -17,6 +17,9 @@ As a bonus, this sample also exposes the gRPC server's port directly.  This allo
 
 - ![images/grpc_web.png](images/grpc_web.png)
 
+
+>> Please note, if all you need to do is grpc+ingress+gke, please see [exapmple grpcIngress deployment](https://github.com/GoogleCloudPlatform/gke-networking-recipes/tree/master/ingress/single-cluster/ingress-custom-grpc-health-check/example)
+
 You can read more about gRPC and gRPC-web in the references cited below.
 
 ## gRPC Transcoding vs gRPC Web vs gRPC Native
@@ -55,6 +58,8 @@ The BackendConfig makes the workarounds using mux and envoy described  in this r
 
   - [Ingress-gce PR#807](https://github.com/kubernetes/ingress-gce/pull/807)
 
+`Update 12/24/21`: 
+    Fixed broken nodejs and GKE configurations to account for `HealthChecks` and `BackendConfig`.  Confirmed working on GKE
 
 ## Setup
 
@@ -180,8 +185,8 @@ The grpc_proxy listens on port `:18080`. You can run it locally within a docker 
 If you choose to use the images I uploaded, just run:
 
 ```
-$ cd gke_config/
-$ kubectl apply -f .
+cd gke_config/
+kubectl apply -f .
 ```
 
 Otherwise, edit each yaml file under `gke_config/` folder and change the image reference to your registry.
@@ -219,6 +224,21 @@ secret/fe-secret             Opaque                                2      2m58s
 > *NOTE:* Deployment and availability of the endpoint IP may take `8->10minutes`
 
 ![images/ingress_config.png](images/ingress_config.png)
+
+Side note, envoy is configured for CORS
+
+```bash
+curl -v --cacert CA_crt.pem -H "Origin: https://server.domain.com" \
+   -H "Access-Control-Request-Method: GET"  \
+   -H "Access-Control-Request-Headers: Authorization, X-grpc-web" \
+   -H "host: grpcweb.domain.com" -X OPTIONS  https://grpcweb.domain.com/echo.EchoServer
+
+< HTTP/1.1 200 OK
+< access-control-allow-origin: https://server.domain.com
+< access-control-allow-methods: GET, PUT, DELETE, POST, OPTIONS
+< access-control-allow-headers: keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,custom-header-1,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web
+< access-control-expose-headers: custom-header-1,grpc-status,grpc-message
+```
 
 ## Browser
 
@@ -270,21 +290,9 @@ x-envoy-upstream-service-time: 0
 
 ## gRPC Client
 
-The following configuration describes how to access the gRPC service directly (i.,e not via envoy or grpc-Web).
+>>> Update 12/25/21:  for ingress+grpc on GKE, please just use
+[https://github.com/GoogleCloudPlatform/gke-networking-recipes/tree/master/ingress/single-cluster/ingress-custom-grpc-health-check/example](https://github.com/GoogleCloudPlatform/gke-networking-recipes/tree/master/ingress/single-cluster/ingress-custom-grpc-health-check/example)
 
-The main issue with this is you need to account for the healthcheck and grpc ports at the same time as described above.  It just **HAPPENS** that a `/` HTTP/2 request to a golang webserver responds back with a `200 OK` which is enough for the GPC HC to think its all good.  ofcourse do NOT do rely on this capability!!! its just golag (other languages like java and python gRPC services do not honor that same behavior).
-So, if you just wanted to test external connectivity in golang...change the service type in the yaml file from `ClusterIP` --> `NodePort`, redeploy....again, just do this to see; do not use this in prod..
-
-```
-$ docker run --add-host grpc.domain.com:35.241.41.138  -t salrashid123/grpc_backend /grpc_client --host grpc.domain.com:443
-2018/09/03 15:55:33 RPC Response: 0 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
-2018/09/03 15:55:34 RPC Response: 1 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
-2018/09/03 15:55:35 RPC Response: 2 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth"
-2018/09/03 15:55:36 RPC Response: 3 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth"
-2018/09/03 15:55:37 RPC Response: 4 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-c7fth"
-2018/09/03 15:55:38 RPC Response: 5 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
-2018/09/03 15:55:39 RPC Response: 6 message:"Hello unary RPC msg   from hostname be-deployment-68c7bfd9f9-5hccn"
-```
 
 
 ## Conclusion
@@ -302,42 +310,3 @@ Some other References you maybe interested in:
 - [gRPC-web "helloworld"](https://github.com/salrashid123/gcegrpc/tree/master/grpc-web)
 - [gRPC with curl](https://github.com/salrashid123/grpc_curl)
 
-## Appendix
-
-### Openssl
-
-The CA Certificate and server certificate in this repo is the same and shared across all the components.  If you wanted to test this repo out with your own self-signed certs, you can use the following procedure to gerneate your own CA and server certificates.
-
-- Setup the serial and index file for openssl
-```
-cd certs
-mkdir new_certs
-touch index.txt
-echo 00 > serial
-```
-
-- Generate the CA certificate and key
-```
-openssl genrsa -out CA_key.pem 2048
-openssl req -x509 -days 600 -new -nodes -key CA_key.pem -out CA_crt.pem -extensions v3_ca -config openssl.cnf    -subj "/C=US/ST=California/L=Mountain View/O=Google/OU=Enterprise/CN=MyCA"
-```
-
-- Edit `openssl.cnf` and set the  SNI values as needed
-
-```
-[alt_names]
-DNS.1 = server.domain.com
-DNS.2 = grpc.domain.com
-DNS.3 = grpcweb.domain.com
-DNS.4 = localhost
-```
-
-- Generate the server certificates
-```
-openssl genrsa -out server_key.pem 2048
-openssl req -config openssl.cnf  -out server_csr.pem -key server_key.pem -new -sha256  -extensions v3_req  -subj "/C=US/ST=California/L=Mountain View/O=Google/OU=Enterprise/CN=server.domain.com"
-openssl ca -config openssl.cnf -days 400 -notext  -in server_csr.pem   -out server_crt.pem
-```
-
-- Copy the `.pem` files to each folder (`frontend/`, `backend_grpc/`, `backend_envoy`).
-- Edit `gke_config/fe-secret.yaml` and place the base64 encoded version of the server cert/key file as the tls key and cert.
