@@ -69,12 +69,14 @@ Anyway, if you are still interested:
 
  This step isn't necessary but use statically bound the name `gke-web-ingress` to the Ingress objects later
 
-```
-gcloud compute addresses create gke-web-ingress --global
+```bash
+$ gcloud compute addresses create gke-web-ingress --global
 
-gcloud compute addresses list
-NAME             REGION  ADDRESS        STATUS
-gke-web-ingress          35.241.41.138  RESERVED
+$ gcloud compute addresses list
+
+  NAME             ADDRESS/RANGE  TYPE      PURPOSE  NETWORK  REGION  SUBNET  STATUS
+  gke-web-ingress  34.49.178.149  EXTERNAL                                    RESERVED
+
 ```
 
 ### Edit /etc/hosts
@@ -89,7 +91,7 @@ Since this is just a demo/POC, statically set the IP to resolve to `.domain.com`
 
 ### Create the GKE cluster
 
-```
+```bash
 gcloud container  clusters create grpc-cluster --machine-type "n1-standard-1"  --zone us-central1-a  --num-nodes 3 --enable-ip-alias
 ```
 
@@ -134,17 +136,18 @@ You can either build the backend or use the one I uploaded here:
 
 To build, git clone the repos above
 
-```
+```bash
 cd backend_grpc
 docker build -t your_registry/grpc_backend .
 ```
 
 to run locally,
-```
+
+```bash
  docker run  -p 50051:50051 -t salrashid123/grpc_backend ./grpc_server -grpcport 0.0.0.0:50051
 ```
 
-```
+```bash
 docker run --net=host --add-host grpc.domain.com:127.0.0.1 -t salrashid123/grpc_backend /grpc_client --host grpc.domain.com:50051
 ```
 
@@ -154,14 +157,14 @@ You can either build the backend or use the one I uploaded here
 
 - `docker.io/salrashid123/web_frontend`
 
-```
+```bash
 cd frontend
 docker build -t your_registry/web_frontend .
 ```
 
 The frontend listens on port `:8000` so to run it localy, execute something like:
 
-```
+```bash
 docker run -p 8000:8000 salrashid123/web_frontend
 ```
 
@@ -171,7 +174,7 @@ You can either build the envoyproxy container or use the one I uploaded here
 
 - `docker.io/salrashid123/grpc_envoyproxy`
 
-```
+```bash
 cd backend_envoy
 docker build -t your_registry/grpc_envoyproxy .
 ```
@@ -184,7 +187,7 @@ The grpc_proxy listens on port `:18080`. You can run it locally within a docker 
 
 If you choose to use the images I uploaded, just run:
 
-```
+```bash
 cd gke_config/
 kubectl apply -f .
 ```
@@ -196,29 +199,30 @@ Once you deploy, you should see the deploymets and the staticIP attached to the 
 
 ```bash
 $ kubectl get po,rc,svc,ing,deployments,secrets
-NAME                                      READY   STATUS    RESTARTS   AGE
-pod/be-deployment-86c95c96d9-7wlmr        1/1     Running   0          2m58s
-pod/be-grpc-deployment-5b97d84c56-mnqxc   1/1     Running   0          2m58s
-pod/fe-deployment-d9c6b559f-6b79p         1/1     Running   0          2m57s
-pod/fe-deployment-d9c6b559f-gxqt9         1/1     Running   0          2m57s
 
-NAME                  TYPE        CLUSTER-IP   EXTERNAL-IP   PORT(S)           AGE
-service/be-srv        NodePort    10.0.7.254   <none>        18080:30406/TCP   2m58s <<<<<< Envoy
-service/be-srv-grpc   ClusterIP   10.0.6.44    <none>        50051/TCP         2m58s <<<<<< gRPC Service
-service/fe-srv        NodePort    10.0.2.189   <none>        8000:32470/TCP    2m57s <<<<<< Frontend
-service/kubernetes    ClusterIP   10.0.0.1     <none>        443/TCP           17h
+NAME                                     READY   STATUS    RESTARTS   AGE
+pod/be-deployment-648d99fd8f-bzvkw       1/1     Running   0          2m32s
+pod/be-grpc-deployment-8dc9bcfcb-5tfm8   1/1     Running   0          2m32s
+pod/fe-deployment-7b8958b6f9-4kfrl       1/1     Running   0          2m32s
+pod/fe-deployment-7b8958b6f9-d9lv4       1/1     Running   0          2m32s
 
-NAME                               HOSTS                                  ADDRESS          PORTS     AGE
-ingress.extensions/basic-ingress   server.domain.com,grpcweb.domain.com   35.241.41.138    80, 443   2m59s
+NAME                  TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)           AGE
+service/be-srv        NodePort    10.48.233.247   <none>        18080:32044/TCP   2m32s
+service/be-srv-grpc   ClusterIP   10.48.226.26    <none>        50051/TCP         2m32s
+service/fe-srv        NodePort    10.48.231.192   <none>        8000:31876/TCP    2m31s
+service/kubernetes    ClusterIP   10.48.224.1     <none>        443/TCP           17m
 
-NAME                                       READY   UP-TO-DATE   AVAILABLE   AGE
-deployment.extensions/be-deployment        1/1     1            1           2m59s
-deployment.extensions/be-grpc-deployment   1/1     1            1           2m59s
-deployment.extensions/fe-deployment        2/2     2            2           2m58s
+NAME                                      CLASS   HOSTS                                  ADDRESS         PORTS     AGE
+ingress.networking.k8s.io/basic-ingress   gce     server.domain.com,grpcweb.domain.com   34.49.178.149   80, 443   2m33s
 
-NAME                         TYPE                                  DATA   AGE
-secret/default-token-rtv7m   kubernetes.io/service-account-token   3      17h
-secret/fe-secret             Opaque                                2      2m58s
+NAME                                 READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/be-deployment        1/1     1            1           2m32s
+deployment.apps/be-grpc-deployment   1/1     1            1           2m32s
+deployment.apps/fe-deployment        2/2     2            2           2m32s
+
+NAME               TYPE     DATA   AGE
+secret/fe-secret   Opaque   2      2m32s
+
 ```
 
 > *NOTE:* Deployment and availability of the endpoint IP may take `8->10minutes`
@@ -228,16 +232,22 @@ secret/fe-secret             Opaque                                2      2m58s
 Side note, envoy is configured for CORS
 
 ```bash
-curl -v --cacert CA_crt.pem -H "Origin: https://server.domain.com" \
+## make sure you've edited /etc/hosts with the staticIP
+
+curl -v --cacert certs/CA_crt.pem  -H "Origin: https://server.domain.com" \
    -H "Access-Control-Request-Method: GET"  \
    -H "Access-Control-Request-Headers: Authorization, X-grpc-web" \
    -H "host: grpcweb.domain.com" -X OPTIONS  https://grpcweb.domain.com/echo.EchoServer
 
-< HTTP/1.1 200 OK
+< HTTP/2 200 
 < access-control-allow-origin: https://server.domain.com
 < access-control-allow-methods: GET, PUT, DELETE, POST, OPTIONS
 < access-control-allow-headers: keep-alive,user-agent,cache-control,content-type,content-transfer-encoding,custom-header-1,x-accept-content-transfer-encoding,x-accept-response-streaming,x-user-agent,x-grpc-web
 < access-control-expose-headers: custom-header-1,grpc-status,grpc-message
+< date: Sat, 30 Mar 2024 15:55:35 GMT
+< server: envoy        <<<<<<<<<<<<<<<<<<<<<<<
+< content-length: 0
+< via: 1.1 google
 ```
 
 ## Browser
@@ -255,6 +265,7 @@ Click the `Submit` button.  WHat that will do is transmit 1 unary request and 1 
 Here is a sample Request-Response from the browser
 
 - Request
+
 ```
 Host: grpcweb.domain.com
 User-Agent: Mozilla/5.0 (X11; Linux x86_64; rv:52.0) Gecko/20100101 Firefox/52.0
